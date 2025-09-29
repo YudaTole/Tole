@@ -5,21 +5,60 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Catatan Pengeluaran Full</title>
 <style>
-body { font-family: Arial; margin:0; padding:0; background:#f5f5f5; transition: background 0.3s, color 0.3s;}
+/* CSS Dasar */
+body { font-family: Arial, sans-serif; margin:0; padding:0; background:#f5f5f5; transition: background 0.3s, color 0.3s;}
 .container { max-width:900px; margin:20px auto; background:#fff; padding:20px; border-radius:8px; box-shadow:0 0 10px rgba(0,0,0,0.1);}
 h2 { text-align:center; margin-bottom:20px;}
-input, button, select { padding:8px; margin:5px 0; width:100%; box-sizing:border-box;}
-table { width:100%; border-collapse:collapse; margin-top:20px;}
-table, th, td { border:1px solid #ccc;}
-th, td { padding:8px; text-align:center;}
-.logout { text-align:right; margin-bottom:10px;}
-.total { font-weight:bold; margin-top:10px;}
+input, button, select { padding:8px; margin:5px 0; width:100%; box-sizing:border-box; border: 1px solid #ccc; border-radius: 4px;}
+button { cursor: pointer; background-color: #007bff; color: white; border: none;}
+button:hover { background-color: #0056b3; }
+.logout button { width: auto; }
+
+/* PERBAIKAN KERAPIAN TABEL */
+table { 
+    width: 100%; 
+    border-collapse: collapse; 
+    margin-top: 20px;
+    table-layout: fixed; /* Penting: agar lebar kolom lebih terkontrol */
+}
+th, td { 
+    padding: 8px; 
+    text-align: left; /* Default rata kiri */
+    border: 1px solid #ccc;
+    word-wrap: break-word; 
+}
+/* Menjaga header rata tengah */
+th {
+    background-color: #e0e0e0;
+    font-weight: bold;
+    text-align: center; 
+}
+
+/* Warna Selang-seling (Zebra Stripping) */
+tbody tr:nth-child(even) { 
+    background-color: #f9f9f9; 
+}
+
+/* Keterangan dan Aksi dibuat rata tengah agar seragam dengan header */
+th:nth-child(2), td:nth-child(2), /* Keterangan */
+th:last-child, td:last-child { /* Aksi */
+    text-align: center;
+}
+
+.total { font-weight:bold; margin-top:10px; padding: 5px 0; }
 .download-buttons { display:flex; gap:10px; margin-top:10px; flex-wrap:wrap; }
-.download-buttons button { flex:1; min-width:120px; }
+.download-buttons button { flex:1; min-width:120px; background-color: #28a745; }
+.download-buttons button:hover { background-color: #1e7e34; }
 .chart-container { margin-top:30px; display:flex; flex-wrap:wrap; gap:20px; }
 .chart-container canvas { flex:1; min-width:250px; max-height:250px; }
+
+/* Dark Mode Styling */
 .dark-mode { background:#121212; color:#e0e0e0; }
 .dark-mode .container { background:#1e1e1e; box-shadow:none; }
+.dark-mode input, .dark-mode select { background: #333; color: #e0e0e0; border-color: #555; }
+.dark-mode th { background-color: #333; }
+.dark-mode tbody tr:nth-child(even) { background-color: #282828; }
+.dark-mode table, .dark-mode th, .dark-mode td { border-color: #555; }
 </style>
 </head>
 <body>
@@ -33,8 +72,8 @@ th, td { padding:8px; text-align:center;}
 
 <div class="container" id="main-container" style="display:none;">
   <div class="logout">
-    <button onclick="logout()">Logout</button>
-    <button onclick="toggleDarkMode()">Dark Mode</button>
+    <button onclick="logout()" style="background-color: #dc3545;">Logout</button>
+    <button onclick="toggleDarkMode()" style="background-color: #6c757d;">Dark Mode</button>
   </div>
   <h2>Catatan Pengeluaran</h2>
   
@@ -68,6 +107,7 @@ th, td { padding:8px; text-align:center;}
 
   <div class="download-buttons">
     <button onclick="downloadCSV()">Download CSV</button>
+    <button onclick="downloadExcel()">Download Excel</button> 
     <button onclick="downloadPDF()">Download PDF</button>
     <button onclick="backupJSON()">Backup JSON</button>
     <button onclick="restoreJSON()">Restore JSON</button>
@@ -99,15 +139,20 @@ th, td { padding:8px; text-align:center;}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
+// =========================================================
+// Bagian Umum & Login (Tidak ada perubahan signifikan)
+// =========================================================
 let darkMode = false;
 function toggleDarkMode(){
   darkMode = !darkMode;
   document.body.classList.toggle('dark-mode', darkMode);
 }
 
-// Login
 window.onload = function() {
   if(localStorage.getItem('loggedIn') === 'true') showMain();
+  // Panggil renderTable/Charts agar filter terpasang saat awal load
+  renderTable(); 
+  renderCharts();
 }
 
 function login() {
@@ -157,51 +202,107 @@ function addExpense(){
 }
 
 function editExpense(index){
-  let expenses = JSON.parse(localStorage.getItem('expenses'))||[];
-  const exp = expenses[index];
-  document.getElementById('date').value = exp.date;
-  document.getElementById('description').value = exp.description;
-  document.getElementById('amount').value = exp.amount;
-  document.getElementById('category').value = exp.category;
-  expenses.splice(index,1);
-  localStorage.setItem('expenses', JSON.stringify(expenses));
-  renderTable();
-  renderCharts();
+  let expenses = getFilteredExpenses(); // Ambil data terfilter
+  const originalExpenses = JSON.parse(localStorage.getItem('expenses'))||[];
+  
+  // Temukan index aslinya di array tanpa filter
+  const expToEdit = expenses[index];
+  const originalIndex = originalExpenses.findIndex(e => 
+    e.date === expToEdit.date && 
+    e.description === expToEdit.description && 
+    e.amount === expToEdit.amount && 
+    e.category === expToEdit.category
+  );
+  
+  if (originalIndex > -1) {
+    const exp = originalExpenses[originalIndex];
+    document.getElementById('date').value = exp.date;
+    document.getElementById('description').value = exp.description;
+    document.getElementById('amount').value = exp.amount;
+    document.getElementById('category').value = exp.category;
+    originalExpenses.splice(originalIndex, 1);
+    localStorage.setItem('expenses', JSON.stringify(originalExpenses));
+    renderTable();
+    renderCharts();
+  } else {
+    alert('Kesalahan saat mencoba mengedit item.');
+  }
 }
+
 
 function deleteExpense(index){
-  let expenses = JSON.parse(localStorage.getItem('expenses'))||[];
-  expenses.splice(index,1);
-  localStorage.setItem('expenses', JSON.stringify(expenses));
-  renderTable();
-  renderCharts();
+  let expenses = getFilteredExpenses(); // Ambil data terfilter
+  const originalExpenses = JSON.parse(localStorage.getItem('expenses'))||[];
+  
+  // Temukan index aslinya di array tanpa filter
+  const expToDelete = expenses[index];
+  const originalIndex = originalExpenses.findIndex(e => 
+    e.date === expToDelete.date && 
+    e.description === expToDelete.description && 
+    e.amount === expToDelete.amount && 
+    e.category === expToDelete.category
+  );
+  
+  if (originalIndex > -1) {
+    originalExpenses.splice(originalIndex, 1);
+    localStorage.setItem('expenses', JSON.stringify(originalExpenses));
+    renderTable();
+    renderCharts();
+  }
 }
 
-// Render table + total
-function renderTable(){
-  const tbody = document.getElementById('expense-table');
-  tbody.innerHTML='';
+// =========================================================
+// FUNGSI UTAMA UNTUK FILTER (Penting untuk download!)
+// =========================================================
+
+function getFilteredExpenses(){
   const filterType = document.getElementById('filter-type').value;
   const startDate = document.getElementById('start-date').value;
   const endDate = document.getElementById('end-date').value;
   const filterCat = document.getElementById('filter-category').value;
   let expenses = JSON.parse(localStorage.getItem('expenses'))||[];
 
-  expenses = expenses.filter(e=>{
+  return expenses.filter(e=>{
     let include=true;
+    const expenseDate = new Date(e.date);
+    expenseDate.setHours(0,0,0,0); // Normalisasi waktu
+
     if(filterType==='week'){
       const today=new Date();
-      const weekStart=new Date(today); weekStart.setDate(today.getDate()-today.getDay());
-      include = include && new Date(e.date)>=weekStart;
+      const weekStart=new Date(today); 
+      weekStart.setHours(0,0,0,0); 
+      weekStart.setDate(today.getDate()-today.getDay()); // Minggu dimulai dari hari Minggu (0)
+      include = include && expenseDate.getTime()>=weekStart.getTime();
     } else if(filterType==='month'){
       const today=new Date();
-      include = include && new Date(e.date).getMonth()===today.getMonth() && new Date(e.date).getFullYear()===today.getFullYear();
+      include = include && expenseDate.getMonth()===today.getMonth() && expenseDate.getFullYear()===today.getFullYear();
     }
-    if(startDate) include = include && new Date(e.date)>=new Date(startDate);
-    if(endDate) include = include && new Date(e.date)<=new Date(endDate);
+    
+    // Filter Tanggal Kustom
+    if(startDate){
+      const start=new Date(startDate); start.setHours(0,0,0,0);
+      include = include && expenseDate.getTime()>=start.getTime();
+    }
+    if(endDate){
+      const end=new Date(endDate); end.setHours(0,0,0,0);
+      include = include && expenseDate.getTime()<=end.getTime();
+    }
+    
     if(filterCat!=='all') include = include && e.category===filterCat;
     return include;
   });
+}
+
+
+// =========================================================
+// Render table + total
+// =========================================================
+function renderTable(){
+  const tbody = document.getElementById('expense-table');
+  tbody.innerHTML='';
+  
+  // Menggunakan data yang sudah difilter
+  let expenses = getFilteredExpenses(); 
 
   let total=0;
   expenses.forEach((exp,index)=>{
@@ -209,29 +310,74 @@ function renderTable(){
     tbody.innerHTML+=`<tr>
       <td>${exp.date}</td>
       <td>${exp.description}</td>
-      <td>${exp.amount.toLocaleString('id-ID')}</td>
+      <td style="text-align: right;">Rp ${parseInt(exp.amount).toLocaleString('id-ID')}</td>
       <td>${exp.category}</td>
       <td>
-        <button onclick="editExpense(${index})">Edit</button>
-        <button onclick="deleteExpense(${index})">Hapus</button>
+        <button onclick="editExpense(${index})" style="background-color: #ffc107; color: black; margin: 2px;">Edit</button>
+        <button onclick="deleteExpense(${index})" style="background-color: #dc3545; margin: 2px;">Hapus</button>
       </td>
     </tr>`;
   });
   document.getElementById('total-expense').innerText = `Total: Rp ${total.toLocaleString('id-ID')}`;
 }
 
+
+// =========================================================
+// FUNGSI DOWNLOAD
+// =========================================================
+
 // CSV
 function downloadCSV(){
   const expenses = getFilteredExpenses();
   let csv = 'Tanggal,Keterangan,Jumlah,Kategori\n';
-  expenses.forEach(e=>{ csv+=`${e.date},${e.description},${e.amount},${e.category}\n`; });
-  const blob = new Blob([csv], {type:'text/csv'});
+  expenses.forEach(e=>{ 
+    // Pastikan deskripsi tidak mengandung koma, jika ada, beri kutip
+    const description = e.description.includes(',') ? `"${e.description}"` : e.description;
+    csv+=`${e.date},${description},${e.amount},${e.category}\n`; 
+  });
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `pengeluaran.csv`;
+  a.download = `pengeluaran_${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+// FUNGSI BARU: EXCEL (.xls)
+function downloadExcel(){
+    const expenses = getFilteredExpenses();
+    let table = '<table><tr><th>Tanggal</th><th>Keterangan</th><th>Jumlah</th><th>Kategori</th></tr>';
+
+    expenses.forEach(e=>{
+        table += `<tr>
+            <td>${e.date}</td>
+            <td>${e.description}</td>
+            <td data-type="number">${e.amount}</td>
+            <td>${e.category}</td>
+        </tr>`;
+    });
+    table += '</table>';
+
+    const excelContent = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+        <head>
+            <meta charset="utf-8" />
+            <style>td {mso-number-format:"\#\,\#\#0";}</style>
+        </head>
+        <body>
+            ${table}
+        </body>
+        </html>
+    `;
+
+    const blob = new Blob([excelContent], { type: 'application/vnd.ms-excel' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `pengeluaran_${new Date().toISOString().slice(0, 10)}.xls`;
+    a.click();
+    URL.revokeObjectURL(url);
 }
 
 // PDF
@@ -239,31 +385,67 @@ async function downloadPDF(){
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
   const expenses = getFilteredExpenses();
-  let y=10;
-  doc.setFontSize(14);
-  doc.text('Catatan Pengeluaran',105,y,{align:'center'});
-  y+=10;
-  doc.setFontSize(12);
-  doc.text('Tanggal   Keterangan   Jumlah   Kategori',10,y);
-  y+=6;
-  let total=0;
-  expenses.forEach(e=>{
-    doc.text(`${e.date}   ${e.description}   ${e.amount.toLocaleString('id-ID')}   ${e.category}`,10,y);
-    y+=6; total+=parseInt(e.amount);
+  
+  // Untuk data tabel PDF yang lebih rapi
+  const tableData = expenses.map(e => [
+    e.date,
+    e.description,
+    `Rp ${parseInt(e.amount).toLocaleString('id-ID')}`,
+    e.category
+  ]);
+  
+  const headers = [['Tanggal', 'Keterangan', 'Jumlah', 'Kategori']];
+  
+  // Menggunakan autoTable dari jsPDF (walaupun tidak di load, ini struktur idealnya)
+  // Karena jsPDF yang di load adalah versi dasar, kita pakai metode text
+  
+  let y = 20;
+  doc.setFontSize(16);
+  doc.text('Catatan Pengeluaran', 105, 10, {align: 'center'});
+  
+  // Fungsi addTextTable (manual)
+  doc.setFontSize(10);
+  let total = 0;
+  
+  // Header Manual
+  doc.text('Tanggal', 10, y);
+  doc.text('Keterangan', 40, y);
+  doc.text('Jumlah', 100, y);
+  doc.text('Kategori', 140, y);
+  y += 5;
+  doc.line(10, y, 200, y); // Garis pemisah
+  y += 5;
+  
+  expenses.forEach(e => {
+    if (y > 280) { // Cek batas halaman
+      doc.addPage();
+      y = 10;
+    }
+    doc.text(e.date, 10, y);
+    doc.text(e.description.substring(0, 30) + (e.description.length > 30 ? '...' : ''), 40, y);
+    doc.text(`Rp ${parseInt(e.amount).toLocaleString('id-ID')}`, 100, y);
+    doc.text(e.category, 140, y);
+    y += 7;
+    total += parseInt(e.amount);
   });
-  y+=6;
-  doc.text(`Total: Rp ${total.toLocaleString('id-ID')}`,10,y);
-  doc.save('pengeluaran.pdf');
+  
+  y += 5;
+  doc.line(10, y, 200, y); // Garis pemisah
+  y += 5;
+  doc.setFontSize(12);
+  doc.text(`Total Pengeluaran: Rp ${total.toLocaleString('id-ID')}`, 10, y);
+  
+  doc.save(`pengeluaran_${new Date().toISOString().slice(0, 10)}.pdf`);
 }
 
-// Backup & Restore JSON
+// Backup & Restore JSON (Tidak ada perubahan)
 function backupJSON(){
   const data = localStorage.getItem('expenses');
   const blob = new Blob([data], {type:'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'pengeluaran_backup.json';
+  a.download = `pengeluaran_backup_${new Date().toISOString().slice(0, 10)}.json`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -290,11 +472,12 @@ function restoreJSON(){
   input.click();
 }
 
-// Charts
+// Charts (Disesuaikan agar menggunakan getFilteredExpenses)
 let weeklyChart, monthlyChart, categoryChart;
 function renderCharts(){
-  const expenses = JSON.parse(localStorage.getItem('expenses'))||[];
+  const expenses = getFilteredExpenses(); // Menggunakan data yang sudah difilter
 
+  // Logic chart lainnya tetap sama...
   // Weekly chart
   const weekLabels=[];
   const weekData=[];
@@ -317,9 +500,12 @@ function renderCharts(){
   const monthLabels=[];
   const monthData=[];
   for(let m=0;m<12;m++){
-    monthLabels.push(`${m+1}/${new Date().getFullYear()}`);
-    const total = expenses.filter(e=>new Date(e.date).getMonth()===m)
-                          .reduce((sum,e)=>sum+parseInt(e.amount),0);
+    const year = new Date().getFullYear();
+    monthLabels.push(`${m+1}/${year}`);
+    const total = expenses.filter(e=>{
+      const expDate = new Date(e.date);
+      return expDate.getMonth()===m && expDate.getFullYear()===year;
+    }).reduce((sum,e)=>sum+parseInt(e.amount),0);
     monthData.push(total);
   }
   if(monthlyChart) monthlyChart.destroy();
@@ -347,4 +533,5 @@ document.getElementById('end-date').addEventListener('change',()=>{renderTable()
 document.getElementById('filter-category').addEventListener('change',()=>{renderTable(); renderCharts();});
 </script>
 </body>
-</html>
+    </html>
+  
