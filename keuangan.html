@@ -75,7 +75,7 @@
       <option value="Transportasi">Transportasi</option>
       <option value="Belanja">Belanja</option>
       <option value="Hiburan">Hiburan</option>
-      <option value="Tagihan">Tagihan</option>
+      <option value="Rokok">Rokok</option>
       <option value="Lainnya">Lainnya</option>
     </select>
     
@@ -299,7 +299,7 @@
       const { jsPDF } = window.jspdf;
       let doc = new jsPDF();
       doc.setFontSize(14);
-      doc.text("Laporan Catatan Pengeluaran", 14, 15);
+      doc.text("Laporan Catatan Pengeluaran Tole", 14, 15);
       
       let expenses = getExpenses();
       let total = expenses.reduce((sum, e) => sum + e.amount, 0);
