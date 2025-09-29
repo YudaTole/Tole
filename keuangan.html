@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Catatan Pengeluaran Full</title>
+<style>
+body { font-family: Arial; margin:0; padding:0; background:#f5f5f5; transition: background 0.3s, color 0.3s;}
+.container { max-width:900px; margin:20px auto; background:#fff; padding:20px; border-radius:8px; box-shadow:0 0 10px rgba(0,0,0,0.1);}
+h2 { text-align:center; margin-bottom:20px;}
+input, button, select { padding:8px; margin:5px 0; width:100%; box-sizing:border-box;}
+table { width:100%; border-collapse:collapse; margin-top:20px;}
+table, th, td { border:1px solid #ccc;}
+th, td { padding:8px; text-align:center;}
+.logout { text-align:right; margin-bottom:10px;}
+.total { font-weight:bold; margin-top:10px;}
+.download-buttons { display:flex; gap:10px; margin-top:10px; flex-wrap:wrap; }
+.download-buttons button { flex:1; min-width:120px; }
+.chart-container { margin-top:30px; display:flex; flex-wrap:wrap; gap:20px; }
+.chart-container canvas { flex:1; min-width:250px; max-height:250px; }
+.dark-mode { background:#121212; color:#e0e0e0; }
+.dark-mode .container { background:#1e1e1e; box-shadow:none; }
+</style>
+</head>
+<body>
+
+<div class="container" id="login-container">
+  <h2>Login</h2>
+  <input type="text" id="username" placeholder="Username">
+  <input type="password" id="password" placeholder="Password">
+  <button onclick="login()">Login</button>
+</div>
+
+<div class="container" id="main-container" style="display:none;">
+  <div class="logout">
+    <button onclick="logout()">Logout</button>
+    <button onclick="toggleDarkMode()">Dark Mode</button>
+  </div>
+  <h2>Catatan Pengeluaran</h2>
+  
+  <input type="date" id="date">
+  <input type="text" id="description" placeholder="Keterangan">
+  <input type="number" id="amount" placeholder="Jumlah (Rp)">
+  <select id="category">
+    <option value="Makan">Makan</option>
+    <option value="Transport">Transport</option>
+    <option value="Hiburan">Hiburan</option>
+    <option value="Lainnya">Lainnya</option>
+  </select>
+  <button onclick="addExpense()">Tambah Pengeluaran</button>
+
+  <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
+    <select id="filter-type">
+      <option value="all">Semua</option>
+      <option value="week">Minggu Ini</option>
+      <option value="month">Bulan Ini</option>
+    </select>
+    <input type="date" id="start-date" placeholder="Mulai">
+    <input type="date" id="end-date" placeholder="Sampai">
+    <select id="filter-category">
+      <option value="all">Semua Kategori</option>
+      <option value="Makan">Makan</option>
+      <option value="Transport">Transport</option>
+      <option value="Hiburan">Hiburan</option>
+      <option value="Lainnya">Lainnya</option>
+    </select>
+  </div>
+
+  <div class="download-buttons">
+    <button onclick="downloadCSV()">Download CSV</button>
+    <button onclick="downloadPDF()">Download PDF</button>
+    <button onclick="backupJSON()">Backup JSON</button>
+    <button onclick="restoreJSON()">Restore JSON</button>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Tanggal</th>
+        <th>Keterangan</th>
+        <th>Jumlah (Rp)</th>
+        <th>Kategori</th>
+        <th>Aksi</th>
+      </tr>
+    </thead>
+    <tbody id="expense-table"></tbody>
+  </table>
+
+  <div class="total" id="total-expense">Total: Rp 0</div>
+
+  <div class="chart-container">
+    <canvas id="weeklyChart"></canvas>
+    <canvas id="monthlyChart"></canvas>
+    <canvas id="categoryChart"></canvas>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+let darkMode = false;
+function toggleDarkMode(){
+  darkMode = !darkMode;
+  document.body.classList.toggle('dark-mode', darkMode);
+}
+
+// Login
+window.onload = function() {
+  if(localStorage.getItem('loggedIn') === 'true') showMain();
+}
+
+function login() {
+  const username = document.getElementById('username').value;
+  const password = document.getElementById('password').value;
+  const storedUser = localStorage.getItem('username');
+  const storedPass = localStorage.getItem('password');
+
+  if(storedUser===null){
+    localStorage.setItem('username', username);
+    localStorage.setItem('password', password);
+    localStorage.setItem('loggedIn', 'true');
+    showMain();
+  } else if(username===storedUser && password===storedPass){
+    localStorage.setItem('loggedIn', 'true');
+    showMain();
+  } else { alert('Username atau password salah!'); }
+}
+
+function logout() {
+  localStorage.setItem('loggedIn', 'false');
+  document.getElementById('main-container').style.display='none';
+  document.getElementById('login-container').style.display='block';
+}
+
+function showMain() {
+  document.getElementById('login-container').style.display='none';
+  document.getElementById('main-container').style.display='block';
+  renderTable();
+  renderCharts();
+}
+
+function addExpense(){
+  const date = document.getElementById('date').value;
+  const description = document.getElementById('description').value;
+  const amount = document.getElementById('amount').value;
+  const category = document.getElementById('category').value;
+  if(!date||!description||!amount){alert('Semua field harus diisi!'); return;}
+  let expenses = JSON.parse(localStorage.getItem('expenses'))||[];
+  expenses.push({date, description, amount: parseInt(amount), category});
+  localStorage.setItem('expenses', JSON.stringify(expenses));
+  document.getElementById('date').value='';
+  document.getElementById('description').value='';
+  document.getElementById('amount').value='';
+  renderTable();
+  renderCharts();
+}
+
+function editExpense(index){
+  let expenses = JSON.parse(localStorage.getItem('expenses'))||[];
+  const exp = expenses[index];
+  document.getElementById('date').value = exp.date;
+  document.getElementById('description').value = exp.description;
+  document.getElementById('amount').value = exp.amount;
+  document.getElementById('category').value = exp.category;
+  expenses.splice(index,1);
+  localStorage.setItem('expenses', JSON.stringify(expenses));
+  renderTable();
+  renderCharts();
+}
+
+function deleteExpense(index){
+  let expenses = JSON.parse(localStorage.getItem('expenses'))||[];
+  expenses.splice(index,1);
+  localStorage.setItem('expenses', JSON.stringify(expenses));
+  renderTable();
+  renderCharts();
+}
+
+// Render table + total
+function renderTable(){
+  const tbody = document.getElementById('expense-table');
+  tbody.innerHTML='';
+  const filterType = document.getElementById('filter-type').value;
+  const startDate = document.getElementById('start-date').value;
+  const endDate = document.getElementById('end-date').value;
+  const filterCat = document.getElementById('filter-category').value;
+  let expenses = JSON.parse(localStorage.getItem('expenses'))||[];
+
+  expenses = expenses.filter(e=>{
+    let include=true;
+    if(filterType==='week'){
+      const today=new Date();
+      const weekStart=new Date(today); weekStart.setDate(today.getDate()-today.getDay());
+      include = include && new Date(e.date)>=weekStart;
+    } else if(filterType==='month'){
+      const today=new Date();
+      include = include && new Date(e.date).getMonth()===today.getMonth() && new Date(e.date).getFullYear()===today.getFullYear();
+    }
+    if(startDate) include = include && new Date(e.date)>=new Date(startDate);
+    if(endDate) include = include && new Date(e.date)<=new Date(endDate);
+    if(filterCat!=='all') include = include && e.category===filterCat;
+    return include;
+  });
+
+  let total=0;
+  expenses.forEach((exp,index)=>{
+    total+=parseInt(exp.amount);
+    tbody.innerHTML+=`<tr>
+      <td>${exp.date}</td>
+      <td>${exp.description}</td>
+      <td>${exp.amount.toLocaleString('id-ID')}</td>
+      <td>${exp.category}</td>
+      <td>
+        <button onclick="editExpense(${index})">Edit</button>
+        <button onclick="deleteExpense(${index})">Hapus</button>
+      </td>
+    </tr>`;
+  });
+  document.getElementById('total-expense').innerText = `Total: Rp ${total.toLocaleString('id-ID')}`;
+}
+
+// CSV
+function downloadCSV(){
+  const expenses = getFilteredExpenses();
+  let csv = 'Tanggal,Keterangan,Jumlah,Kategori\n';
+  expenses.forEach(e=>{ csv+=`${e.date},${e.description},${e.amount},${e.category}\n`; });
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `pengeluaran.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// PDF
+async function downloadPDF(){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const expenses = getFilteredExpenses();
+  let y=10;
+  doc.setFontSize(14);
+  doc.text('Catatan Pengeluaran',105,y,{align:'center'});
+  y+=10;
+  doc.setFontSize(12);
+  doc.text('Tanggal   Keterangan   Jumlah   Kategori',10,y);
+  y+=6;
+  let total=0;
+  expenses.forEach(e=>{
+    doc.text(`${e.date}   ${e.description}   ${e.amount.toLocaleString('id-ID')}   ${e.category}`,10,y);
+    y+=6; total+=parseInt(e.amount);
+  });
+  y+=6;
+  doc.text(`Total: Rp ${total.toLocaleString('id-ID')}`,10,y);
+  doc.save('pengeluaran.pdf');
+}
+
+// Backup & Restore JSON
+function backupJSON(){
+  const data = localStorage.getItem('expenses');
+  const blob = new Blob([data], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'pengeluaran_backup.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+function restoreJSON(){
+  const input = document.createElement('input');
+  input.type='file';
+  input.accept='application/json';
+  input.onchange=e=>{
+    const file=e.target.files[0];
+    const reader=new FileReader();
+    reader.onload=event=>{
+      try{
+        const data=JSON.parse(event.target.result);
+        if(Array.isArray(data)){
+          localStorage.setItem('expenses',JSON.stringify(data));
+          renderTable();
+          renderCharts();
+          alert('Restore berhasil!');
+        } else alert('File tidak valid!');
+      } catch(err){alert('File tidak valid!');}
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+// Charts
+let weeklyChart, monthlyChart, categoryChart;
+function renderCharts(){
+  const expenses = JSON.parse(localStorage.getItem('expenses'))||[];
+
+  // Weekly chart
+  const weekLabels=[];
+  const weekData=[];
+  for(let i=6;i>=0;i--){
+    const d=new Date(); d.setDate(d.getDate()-i);
+    const label=`${d.getDate()}/${d.getMonth()+1}`;
+    weekLabels.push(label);
+    const total = expenses.filter(e=>e.date===d.toISOString().slice(0,10))
+                          .reduce((sum,e)=>sum+parseInt(e.amount),0);
+    weekData.push(total);
+  }
+  if(weeklyChart) weeklyChart.destroy();
+  weeklyChart=new Chart(document.getElementById('weeklyChart').getContext('2d'),{
+    type:'bar',
+    data:{labels:weekLabels,datasets:[{label:'Pengeluaran Mingguan',data:weekData,backgroundColor:'rgba(54,162,235,0.6)'}]},
+    options:{responsive:true,plugins:{legend:{display:false}}}
+  });
+
+  // Monthly chart
+  const monthLabels=[];
+  const monthData=[];
+  for(let m=0;m<12;m++){
+    monthLabels.push(`${m+1}/${new Date().getFullYear()}`);
+    const total = expenses.filter(e=>new Date(e.date).getMonth()===m)
+                          .reduce((sum,e)=>sum+parseInt(e.amount),0);
+    monthData.push(total);
+  }
+  if(monthlyChart) monthlyChart.destroy();
+  monthlyChart=new Chart(document.getElementById('monthlyChart').getContext('2d'),{
+    type:'line',
+    data:{labels:monthLabels,datasets:[{label:'Pengeluaran Bulanan',data:monthData,backgroundColor:'rgba(255,99,132,0.2)',borderColor:'rgba(255,99,132,1)',fill:true}]},
+    options:{responsive:true,plugins:{legend:{display:false}}}
+  });
+
+  // Category chart
+  const categories=['Makan','Transport','Hiburan','Lainnya'];
+  const catData=categories.map(cat=>expenses.filter(e=>e.category===cat).reduce((sum,e)=>sum+parseInt(e.amount),0));
+  if(categoryChart) categoryChart.destroy();
+  categoryChart=new Chart(document.getElementById('categoryChart').getContext('2d'),{
+    type:'pie',
+    data:{labels:categories,datasets:[{data:catData,backgroundColor:['#FF6384','#36A2EB','#FFCE56','#8AFF33']}]},
+    options:{responsive:true}
+  });
+}
+
+// Filter update
+document.getElementById('filter-type').addEventListener('change',()=>{renderTable(); renderCharts();});
+document.getElementById('start-date').addEventListener('change',()=>{renderTable(); renderCharts();});
+document.getElementById('end-date').addEventListener('change',()=>{renderTable(); renderCharts();});
+document.getElementById('filter-category').addEventListener('change',()=>{renderTable(); renderCharts();});
+</script>
+</body>
+</html>
