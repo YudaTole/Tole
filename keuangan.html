@@ -19,15 +19,16 @@ table {
     width: 100%; 
     border-collapse: collapse; 
     margin-top: 20px;
-    table-layout: fixed; /* Penting: agar lebar kolom lebih terkontrol */
+    table-layout: fixed; /* Agar lebar kolom lebih terkontrol */
 }
 th, td { 
     padding: 8px; 
     text-align: left; /* Default rata kiri */
     border: 1px solid #ccc;
     word-wrap: break-word; 
+    white-space: normal; /* Pastikan teks membungkus */
 }
-/* Menjaga header rata tengah */
+/* Styling Header */
 th {
     background-color: #e0e0e0;
     font-weight: bold;
@@ -39,10 +40,13 @@ tbody tr:nth-child(even) {
     background-color: #f9f9f9; 
 }
 
-/* Keterangan dan Aksi dibuat rata tengah agar seragam dengan header */
+/* Keterangan dan Aksi dibuat rata tengah/kanan agar rapi */
 th:nth-child(2), td:nth-child(2), /* Keterangan */
 th:last-child, td:last-child { /* Aksi */
     text-align: center;
+}
+td:nth-child(3) { /* Kolom Jumlah */
+    text-align: right !important; /* Nilai uang selalu rata kanan */
 }
 
 .total { font-weight:bold; margin-top:10px; padding: 5px 0; }
@@ -68,6 +72,7 @@ th:last-child, td:last-child { /* Aksi */
   <input type="text" id="username" placeholder="Username">
   <input type="password" id="password" placeholder="Password">
   <button onclick="login()">Login</button>
+  <button onclick="register()" style="background-color: #ffc107; color: black; margin-top: 10px;">Daftar Akun</button> 
 </div>
 
 <div class="container" id="main-container" style="display:none;">
@@ -140,7 +145,7 @@ th:last-child, td:last-child { /* Aksi */
 
 <script>
 // =========================================================
-// Bagian Umum & Login (Tidak ada perubahan signifikan)
+// Bagian Umum, Login, dan Daftar Akun
 // =========================================================
 let darkMode = false;
 function toggleDarkMode(){
@@ -150,26 +155,54 @@ function toggleDarkMode(){
 
 window.onload = function() {
   if(localStorage.getItem('loggedIn') === 'true') showMain();
-  // Panggil renderTable/Charts agar filter terpasang saat awal load
   renderTable(); 
   renderCharts();
 }
 
+// FUNGSI BARU: DAFTAR AKUN
+function register() {
+  const username = document.getElementById('username').value;
+  const password = document.getElementById('password').value;
+
+  if (!username || !password) {
+    alert('Username dan password harus diisi!');
+    return;
+  }
+  
+  const storedUser = localStorage.getItem('username');
+  
+  if (storedUser) {
+    alert('Akun sudah terdaftar. Silakan login.');
+    return;
+  }
+
+  // Simpan akun baru
+  localStorage.setItem('username', username);
+  localStorage.setItem('password', password);
+  localStorage.setItem('loggedIn', 'true');
+  
+  alert('Pendaftaran berhasil! Anda akan langsung masuk.');
+  showMain();
+}
+
+// FUNGSI LOGIN (Disesuaikan)
 function login() {
   const username = document.getElementById('username').value;
   const password = document.getElementById('password').value;
   const storedUser = localStorage.getItem('username');
   const storedPass = localStorage.getItem('password');
 
-  if(storedUser===null){
-    localStorage.setItem('username', username);
-    localStorage.setItem('password', password);
+  if (storedUser === null) {
+    alert('Belum ada akun yang terdaftar. Silakan Daftar Akun terlebih dahulu!');
+    return;
+  } 
+
+  if(username===storedUser && password===storedPass){
     localStorage.setItem('loggedIn', 'true');
     showMain();
-  } else if(username===storedUser && password===storedPass){
-    localStorage.setItem('loggedIn', 'true');
-    showMain();
-  } else { alert('Username atau password salah!'); }
+  } else { 
+    alert('Username atau password salah!'); 
+  }
 }
 
 function logout() {
@@ -202,10 +235,9 @@ function addExpense(){
 }
 
 function editExpense(index){
-  let expenses = getFilteredExpenses(); // Ambil data terfilter
+  let expenses = getFilteredExpenses(); 
   const originalExpenses = JSON.parse(localStorage.getItem('expenses'))||[];
   
-  // Temukan index aslinya di array tanpa filter
   const expToEdit = expenses[index];
   const originalIndex = originalExpenses.findIndex(e => 
     e.date === expToEdit.date && 
@@ -229,12 +261,10 @@ function editExpense(index){
   }
 }
 
-
 function deleteExpense(index){
-  let expenses = getFilteredExpenses(); // Ambil data terfilter
+  let expenses = getFilteredExpenses();
   const originalExpenses = JSON.parse(localStorage.getItem('expenses'))||[];
   
-  // Temukan index aslinya di array tanpa filter
   const expToDelete = expenses[index];
   const originalIndex = originalExpenses.findIndex(e => 
     e.date === expToDelete.date && 
@@ -252,7 +282,7 @@ function deleteExpense(index){
 }
 
 // =========================================================
-// FUNGSI UTAMA UNTUK FILTER (Penting untuk download!)
+// FUNGSI FILTER UTAMA
 // =========================================================
 
 function getFilteredExpenses(){
@@ -265,13 +295,13 @@ function getFilteredExpenses(){
   return expenses.filter(e=>{
     let include=true;
     const expenseDate = new Date(e.date);
-    expenseDate.setHours(0,0,0,0); // Normalisasi waktu
+    expenseDate.setHours(0,0,0,0); 
 
     if(filterType==='week'){
       const today=new Date();
       const weekStart=new Date(today); 
       weekStart.setHours(0,0,0,0); 
-      weekStart.setDate(today.getDate()-today.getDay()); // Minggu dimulai dari hari Minggu (0)
+      weekStart.setDate(today.getDate()-today.getDay());
       include = include && expenseDate.getTime()>=weekStart.getTime();
     } else if(filterType==='month'){
       const today=new Date();
@@ -301,7 +331,6 @@ function renderTable(){
   const tbody = document.getElementById('expense-table');
   tbody.innerHTML='';
   
-  // Menggunakan data yang sudah difilter
   let expenses = getFilteredExpenses(); 
 
   let total=0;
@@ -310,11 +339,11 @@ function renderTable(){
     tbody.innerHTML+=`<tr>
       <td>${exp.date}</td>
       <td>${exp.description}</td>
-      <td style="text-align: right;">Rp ${parseInt(exp.amount).toLocaleString('id-ID')}</td>
+      <td>Rp ${parseInt(exp.amount).toLocaleString('id-ID')}</td>
       <td>${exp.category}</td>
       <td>
-        <button onclick="editExpense(${index})" style="background-color: #ffc107; color: black; margin: 2px;">Edit</button>
-        <button onclick="deleteExpense(${index})" style="background-color: #dc3545; margin: 2px;">Hapus</button>
+        <button onclick="editExpense(${index})" style="background-color: #ffc107; color: black; margin: 2px; width: 45%;">Edit</button>
+        <button onclick="deleteExpense(${index})" style="background-color: #dc3545; margin: 2px; width: 45%;">Hapus</button>
       </td>
     </tr>`;
   });
@@ -331,7 +360,6 @@ function downloadCSV(){
   const expenses = getFilteredExpenses();
   let csv = 'Tanggal,Keterangan,Jumlah,Kategori\n';
   expenses.forEach(e=>{ 
-    // Pastikan deskripsi tidak mengandung koma, jika ada, beri kutip
     const description = e.description.includes(',') ? `"${e.description}"` : e.description;
     csv+=`${e.date},${description},${e.amount},${e.category}\n`; 
   });
@@ -344,7 +372,7 @@ function downloadCSV(){
   URL.revokeObjectURL(url);
 }
 
-// FUNGSI BARU: EXCEL (.xls)
+// BARU: EXCEL (.xls)
 function downloadExcel(){
     const expenses = getFilteredExpenses();
     let table = '<table><tr><th>Tanggal</th><th>Keterangan</th><th>Jumlah</th><th>Kategori</th></tr>';
@@ -386,24 +414,10 @@ async function downloadPDF(){
   const doc = new jsPDF();
   const expenses = getFilteredExpenses();
   
-  // Untuk data tabel PDF yang lebih rapi
-  const tableData = expenses.map(e => [
-    e.date,
-    e.description,
-    `Rp ${parseInt(e.amount).toLocaleString('id-ID')}`,
-    e.category
-  ]);
-  
-  const headers = [['Tanggal', 'Keterangan', 'Jumlah', 'Kategori']];
-  
-  // Menggunakan autoTable dari jsPDF (walaupun tidak di load, ini struktur idealnya)
-  // Karena jsPDF yang di load adalah versi dasar, kita pakai metode text
-  
   let y = 20;
   doc.setFontSize(16);
   doc.text('Catatan Pengeluaran', 105, 10, {align: 'center'});
   
-  // Fungsi addTextTable (manual)
   doc.setFontSize(10);
   let total = 0;
   
@@ -413,11 +427,11 @@ async function downloadPDF(){
   doc.text('Jumlah', 100, y);
   doc.text('Kategori', 140, y);
   y += 5;
-  doc.line(10, y, 200, y); // Garis pemisah
+  doc.line(10, y, 200, y); 
   y += 5;
   
   expenses.forEach(e => {
-    if (y > 280) { // Cek batas halaman
+    if (y > 280) { 
       doc.addPage();
       y = 10;
     }
@@ -430,7 +444,7 @@ async function downloadPDF(){
   });
   
   y += 5;
-  doc.line(10, y, 200, y); // Garis pemisah
+  doc.line(10, y, 200, y); 
   y += 5;
   doc.setFontSize(12);
   doc.text(`Total Pengeluaran: Rp ${total.toLocaleString('id-ID')}`, 10, y);
@@ -472,12 +486,11 @@ function restoreJSON(){
   input.click();
 }
 
-// Charts (Disesuaikan agar menggunakan getFilteredExpenses)
+// Charts (Menggunakan getFilteredExpenses)
 let weeklyChart, monthlyChart, categoryChart;
 function renderCharts(){
-  const expenses = getFilteredExpenses(); // Menggunakan data yang sudah difilter
+  const expenses = getFilteredExpenses(); 
 
-  // Logic chart lainnya tetap sama...
   // Weekly chart
   const weekLabels=[];
   const weekData=[];
@@ -533,5 +546,4 @@ document.getElementById('end-date').addEventListener('change',()=>{renderTable()
 document.getElementById('filter-category').addEventListener('change',()=>{renderTable(); renderCharts();});
 </script>
 </body>
-    </html>
-  
+</html>
