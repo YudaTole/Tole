@@ -1,549 +1,324 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Catatan Pengeluaran Full</title>
-<style>
-/* CSS Dasar */
-body { font-family: Arial, sans-serif; margin:0; padding:0; background:#f5f5f5; transition: background 0.3s, color 0.3s;}
-.container { max-width:900px; margin:20px auto; background:#fff; padding:20px; border-radius:8px; box-shadow:0 0 10px rgba(0,0,0,0.1);}
-h2 { text-align:center; margin-bottom:20px;}
-input, button, select { padding:8px; margin:5px 0; width:100%; box-sizing:border-box; border: 1px solid #ccc; border-radius: 4px;}
-button { cursor: pointer; background-color: #007bff; color: white; border: none;}
-button:hover { background-color: #0056b3; }
-.logout button { width: auto; }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Catatan Pengeluaran Harian</title>
+  <style>
+    /* CSS Dasar Diambil dari File Parfum */
+    body {
+      margin: 0; font-family: 'Poppins', sans-serif;
+      background: linear-gradient(135deg, #2c3e50, #34495e); color: #fff;
+    }
+    .container {
+      max-width: 700px; margin: 20px auto; background: #1e272e;
+      padding: 20px; border-radius: 15px; box-shadow: 0 0 20px rgba(0,0,0,0.5);
+    }
+    h2 { text-align: center; margin-bottom: 20px; }
+    input, select, button {
+      width: 100%; padding: 10px; margin: 10px 0;
+      border: none; border-radius: 8px; font-size: 14px;
+    }
+    input, select { background: #2d3436; color: #fff; }
+    button { background: #0984e3; color: white; cursor: pointer; font-weight: bold; }
+    button:hover { background: #74b9ff; }
+    .hidden { display: none; }
+    .table-wrapper { overflow-x: auto; }
+    table {
+      width: 100%; border-collapse: collapse; margin-top: 15px; min-width: 650px;
+    }
+    th, td {
+      border: 1px solid #555; padding: 8px; text-align: center;
+    }
+    th { background: #0984e3; }
+    .logout { background: #d63031; margin-top: 10px; }
+    .logout:hover { background: #ff7675; }
+    .hapusBtn, .editBtn {
+      padding: 5px 10px; border: none; border-radius: 5px; cursor: pointer;
+    }
+    .hapusBtn { background: #d63031; color: #fff; }
+    .hapusBtn:hover { background: #ff7675; }
+    .editBtn { background: #00b894; color: #fff; margin-left: 5px; }
+    .editBtn:hover { background: #55efc4; }
+    .exportBtn { background: #6c5ce7; margin-top: 10px; }
+    .exportBtn:hover { background: #a29bfe; }
+    .register-btn { background-color: #ffc107; color: black; margin-top: 5px; }
+    .register-btn:hover { background-color: #e0a800; }
+    /* Penyesuaian khusus untuk kolom uang */
+    #transaksiList td:nth-child(3) { text-align: right; }
+    #transaksiList td:nth-child(4) { text-align: center; }
+  </style>
 
-/* PERBAIKAN KERAPIAN TABEL */
-table { 
-    width: 100%; 
-    border-collapse: collapse; 
-    margin-top: 20px;
-    table-layout: fixed; /* Agar lebar kolom lebih terkontrol */
-}
-th, td { 
-    padding: 8px; 
-    text-align: left; /* Default rata kiri */
-    border: 1px solid #ccc;
-    word-wrap: break-word; 
-    white-space: normal; /* Pastikan teks membungkus */
-}
-/* Styling Header */
-th {
-    background-color: #e0e0e0;
-    font-weight: bold;
-    text-align: center; 
-}
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-/* Warna Selang-seling (Zebra Stripping) */
-tbody tr:nth-child(even) { 
-    background-color: #f9f9f9; 
-}
-
-/* Keterangan dan Aksi dibuat rata tengah/kanan agar rapi */
-th:nth-child(2), td:nth-child(2), /* Keterangan */
-th:last-child, td:last-child { /* Aksi */
-    text-align: center;
-}
-td:nth-child(3) { /* Kolom Jumlah */
-    text-align: right !important; /* Nilai uang selalu rata kanan */
-}
-
-.total { font-weight:bold; margin-top:10px; padding: 5px 0; }
-.download-buttons { display:flex; gap:10px; margin-top:10px; flex-wrap:wrap; }
-.download-buttons button { flex:1; min-width:120px; background-color: #28a745; }
-.download-buttons button:hover { background-color: #1e7e34; }
-.chart-container { margin-top:30px; display:flex; flex-wrap:wrap; gap:20px; }
-.chart-container canvas { flex:1; min-width:250px; max-height:250px; }
-
-/* Dark Mode Styling */
-.dark-mode { background:#121212; color:#e0e0e0; }
-.dark-mode .container { background:#1e1e1e; box-shadow:none; }
-.dark-mode input, .dark-mode select { background: #333; color: #e0e0e0; border-color: #555; }
-.dark-mode th { background-color: #333; }
-.dark-mode tbody tr:nth-child(even) { background-color: #282828; }
-.dark-mode table, .dark-mode th, .dark-mode td { border-color: #555; }
-</style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
-
-<div class="container" id="login-container">
-  <h2>Login</h2>
-  <input type="text" id="username" placeholder="Username">
-  <input type="password" id="password" placeholder="Password">
-  <button onclick="login()">Login</button>
-  <button onclick="register()" style="background-color: #ffc107; color: black; margin-top: 10px;">Daftar Akun</button> 
-</div>
-
-<div class="container" id="main-container" style="display:none;">
-  <div class="logout">
-    <button onclick="logout()" style="background-color: #dc3545;">Logout</button>
-    <button onclick="toggleDarkMode()" style="background-color: #6c757d;">Dark Mode</button>
+  <div class="container" id="authPage">
+    <h2>Login / Daftar Akun</h2>
+    <input type="text" id="username" placeholder="Username">
+    <input type="password" id="password" placeholder="Password">
+    <button onclick="login()">Login</button>
+    <button onclick="register()" class="register-btn">Daftar Akun</button>
   </div>
-  <h2>Catatan Pengeluaran</h2>
-  
-  <input type="date" id="date">
-  <input type="text" id="description" placeholder="Keterangan">
-  <input type="number" id="amount" placeholder="Jumlah (Rp)">
-  <select id="category">
-    <option value="Makan">Makan</option>
-    <option value="Transport">Transport</option>
-    <option value="Hiburan">Hiburan</option>
-    <option value="Lainnya">Lainnya</option>
-  </select>
-  <button onclick="addExpense()">Tambah Pengeluaran</button>
 
-  <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
-    <select id="filter-type">
-      <option value="all">Semua</option>
-      <option value="week">Minggu Ini</option>
-      <option value="month">Bulan Ini</option>
-    </select>
-    <input type="date" id="start-date" placeholder="Mulai">
-    <input type="date" id="end-date" placeholder="Sampai">
-    <select id="filter-category">
-      <option value="all">Semua Kategori</option>
+  <div class="container hidden" id="mainPage">
+    <h2>Catatan Pengeluaran Harian</h2>
+    
+    <input type="date" id="expenseDate">
+    <input type="text" id="expenseDescription" placeholder="Keterangan Pengeluaran">
+    <input type="number" id="expenseAmount" placeholder="Jumlah (Rp)">
+    <select id="expenseCategory">
+      <option value="">Pilih Kategori</option>
       <option value="Makan">Makan</option>
-      <option value="Transport">Transport</option>
+      <option value="Transportasi">Transportasi</option>
+      <option value="Belanja">Belanja</option>
       <option value="Hiburan">Hiburan</option>
+      <option value="Tagihan">Tagihan</option>
       <option value="Lainnya">Lainnya</option>
     </select>
-  </div>
-
-  <div class="download-buttons">
-    <button onclick="downloadCSV()">Download CSV</button>
-    <button onclick="downloadExcel()">Download Excel</button> 
-    <button onclick="downloadPDF()">Download PDF</button>
-    <button onclick="backupJSON()">Backup JSON</button>
-    <button onclick="restoreJSON()">Restore JSON</button>
-  </div>
-
-  <table>
-    <thead>
-      <tr>
-        <th>Tanggal</th>
-        <th>Keterangan</th>
-        <th>Jumlah (Rp)</th>
-        <th>Kategori</th>
-        <th>Aksi</th>
-      </tr>
-    </thead>
-    <tbody id="expense-table"></tbody>
-  </table>
-
-  <div class="total" id="total-expense">Total: Rp 0</div>
-
-  <div class="chart-container">
-    <canvas id="weeklyChart"></canvas>
-    <canvas id="monthlyChart"></canvas>
-    <canvas id="categoryChart"></canvas>
-  </div>
-</div>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-<script>
-// =========================================================
-// Bagian Umum, Login, dan Daftar Akun
-// =========================================================
-let darkMode = false;
-function toggleDarkMode(){
-  darkMode = !darkMode;
-  document.body.classList.toggle('dark-mode', darkMode);
-}
-
-window.onload = function() {
-  if(localStorage.getItem('loggedIn') === 'true') showMain();
-  renderTable(); 
-  renderCharts();
-}
-
-// FUNGSI BARU: DAFTAR AKUN
-function register() {
-  const username = document.getElementById('username').value;
-  const password = document.getElementById('password').value;
-
-  if (!username || !password) {
-    alert('Username dan password harus diisi!');
-    return;
-  }
-  
-  const storedUser = localStorage.getItem('username');
-  
-  if (storedUser) {
-    alert('Akun sudah terdaftar. Silakan login.');
-    return;
-  }
-
-  // Simpan akun baru
-  localStorage.setItem('username', username);
-  localStorage.setItem('password', password);
-  localStorage.setItem('loggedIn', 'true');
-  
-  alert('Pendaftaran berhasil! Anda akan langsung masuk.');
-  showMain();
-}
-
-// FUNGSI LOGIN (Disesuaikan)
-function login() {
-  const username = document.getElementById('username').value;
-  const password = document.getElementById('password').value;
-  const storedUser = localStorage.getItem('username');
-  const storedPass = localStorage.getItem('password');
-
-  if (storedUser === null) {
-    alert('Belum ada akun yang terdaftar. Silakan Daftar Akun terlebih dahulu!');
-    return;
-  } 
-
-  if(username===storedUser && password===storedPass){
-    localStorage.setItem('loggedIn', 'true');
-    showMain();
-  } else { 
-    alert('Username atau password salah!'); 
-  }
-}
-
-function logout() {
-  localStorage.setItem('loggedIn', 'false');
-  document.getElementById('main-container').style.display='none';
-  document.getElementById('login-container').style.display='block';
-}
-
-function showMain() {
-  document.getElementById('login-container').style.display='none';
-  document.getElementById('main-container').style.display='block';
-  renderTable();
-  renderCharts();
-}
-
-function addExpense(){
-  const date = document.getElementById('date').value;
-  const description = document.getElementById('description').value;
-  const amount = document.getElementById('amount').value;
-  const category = document.getElementById('category').value;
-  if(!date||!description||!amount){alert('Semua field harus diisi!'); return;}
-  let expenses = JSON.parse(localStorage.getItem('expenses'))||[];
-  expenses.push({date, description, amount: parseInt(amount), category});
-  localStorage.setItem('expenses', JSON.stringify(expenses));
-  document.getElementById('date').value='';
-  document.getElementById('description').value='';
-  document.getElementById('amount').value='';
-  renderTable();
-  renderCharts();
-}
-
-function editExpense(index){
-  let expenses = getFilteredExpenses(); 
-  const originalExpenses = JSON.parse(localStorage.getItem('expenses'))||[];
-  
-  const expToEdit = expenses[index];
-  const originalIndex = originalExpenses.findIndex(e => 
-    e.date === expToEdit.date && 
-    e.description === expToEdit.description && 
-    e.amount === expToEdit.amount && 
-    e.category === expToEdit.category
-  );
-  
-  if (originalIndex > -1) {
-    const exp = originalExpenses[originalIndex];
-    document.getElementById('date').value = exp.date;
-    document.getElementById('description').value = exp.description;
-    document.getElementById('amount').value = exp.amount;
-    document.getElementById('category').value = exp.category;
-    originalExpenses.splice(originalIndex, 1);
-    localStorage.setItem('expenses', JSON.stringify(originalExpenses));
-    renderTable();
-    renderCharts();
-  } else {
-    alert('Kesalahan saat mencoba mengedit item.');
-  }
-}
-
-function deleteExpense(index){
-  let expenses = getFilteredExpenses();
-  const originalExpenses = JSON.parse(localStorage.getItem('expenses'))||[];
-  
-  const expToDelete = expenses[index];
-  const originalIndex = originalExpenses.findIndex(e => 
-    e.date === expToDelete.date && 
-    e.description === expToDelete.description && 
-    e.amount === expToDelete.amount && 
-    e.category === expToDelete.category
-  );
-  
-  if (originalIndex > -1) {
-    originalExpenses.splice(originalIndex, 1);
-    localStorage.setItem('expenses', JSON.stringify(originalExpenses));
-    renderTable();
-    renderCharts();
-  }
-}
-
-// =========================================================
-// FUNGSI FILTER UTAMA
-// =========================================================
-
-function getFilteredExpenses(){
-  const filterType = document.getElementById('filter-type').value;
-  const startDate = document.getElementById('start-date').value;
-  const endDate = document.getElementById('end-date').value;
-  const filterCat = document.getElementById('filter-category').value;
-  let expenses = JSON.parse(localStorage.getItem('expenses'))||[];
-
-  return expenses.filter(e=>{
-    let include=true;
-    const expenseDate = new Date(e.date);
-    expenseDate.setHours(0,0,0,0); 
-
-    if(filterType==='week'){
-      const today=new Date();
-      const weekStart=new Date(today); 
-      weekStart.setHours(0,0,0,0); 
-      weekStart.setDate(today.getDate()-today.getDay());
-      include = include && expenseDate.getTime()>=weekStart.getTime();
-    } else if(filterType==='month'){
-      const today=new Date();
-      include = include && expenseDate.getMonth()===today.getMonth() && expenseDate.getFullYear()===today.getFullYear();
-    }
     
-    // Filter Tanggal Kustom
-    if(startDate){
-      const start=new Date(startDate); start.setHours(0,0,0,0);
-      include = include && expenseDate.getTime()>=start.getTime();
-    }
-    if(endDate){
-      const end=new Date(endDate); end.setHours(0,0,0,0);
-      include = include && expenseDate.getTime()<=end.getTime();
-    }
+    <button onclick="addExpense()">Tambah Pengeluaran</button>
     
-    if(filterCat!=='all') include = include && e.category===filterCat;
-    return include;
-  });
-}
+    <button class="logout" onclick="logout()">Logout</button>
+    <button class="exportBtn" onclick="exportExcel()">Export ke Excel</button>
+    <button class="exportBtn" onclick="exportPDF()">Export ke PDF</button>
 
+    <h3>Daftar Pengeluaran</h3>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Tanggal</th>
+            <th>Keterangan</th>
+            <th>Jumlah (Rp)</th>
+            <th>Kategori</th>
+            <th>Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="transaksiList"></tbody>
+      </table>
+    </div>
 
-// =========================================================
-// Render table + total
-// =========================================================
-function renderTable(){
-  const tbody = document.getElementById('expense-table');
-  tbody.innerHTML='';
-  
-  let expenses = getFilteredExpenses(); 
+    <h3>Total Pengeluaran: <span id="totalPenjualan">Rp 0</span></h3>
+  </div>
 
-  let total=0;
-  expenses.forEach((exp,index)=>{
-    total+=parseInt(exp.amount);
-    tbody.innerHTML+=`<tr>
-      <td>${exp.date}</td>
-      <td>${exp.description}</td>
-      <td>Rp ${parseInt(exp.amount).toLocaleString('id-ID')}</td>
-      <td>${exp.category}</td>
-      <td>
-        <button onclick="editExpense(${index})" style="background-color: #ffc107; color: black; margin: 2px; width: 45%;">Edit</button>
-        <button onclick="deleteExpense(${index})" style="background-color: #dc3545; margin: 2px; width: 45%;">Hapus</button>
-      </td>
-    </tr>`;
-  });
-  document.getElementById('total-expense').innerText = `Total: Rp ${total.toLocaleString('id-ID')}`;
-}
+  <script>
+    const authPage = document.getElementById("authPage");
+    const mainPage = document.getElementById("mainPage");
+    let editIndex = null;
+    let loggedInUser = localStorage.getItem("loggedInUser");
 
+    window.onload = function() {
+        // Cek status login saat halaman dimuat
+        if(loggedInUser){
+            showMain();
+        }
+    }
 
-// =========================================================
-// FUNGSI DOWNLOAD
-// =========================================================
+    // =========================================================
+    // FUNGSI AUTENTIKASI (Diambil dari file Parfum, diperkuat)
+    // =========================================================
 
-// CSV
-function downloadCSV(){
-  const expenses = getFilteredExpenses();
-  let csv = 'Tanggal,Keterangan,Jumlah,Kategori\n';
-  expenses.forEach(e=>{ 
-    const description = e.description.includes(',') ? `"${e.description}"` : e.description;
-    csv+=`${e.date},${description},${e.amount},${e.category}\n`; 
-  });
-  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `pengeluaran_${new Date().toISOString().slice(0, 10)}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
+    function login(){
+      // .trim() dan .toLowerCase() untuk ketahanan terhadap spasi dan kapitalisasi
+      let user = document.getElementById("username").value.trim().toLowerCase();
+      let pass = document.getElementById("password").value.trim().toLowerCase();
+      let savedUser = localStorage.getItem("user_" + user);
+      
+      if (!user || !pass) {
+        alert("Username dan password harus diisi!");
+        return;
+      }
 
-// BARU: EXCEL (.xls)
-function downloadExcel(){
-    const expenses = getFilteredExpenses();
-    let table = '<table><tr><th>Tanggal</th><th>Keterangan</th><th>Jumlah</th><th>Kategori</th></tr>';
+      if(savedUser){
+        // Cek password yang tersimpan
+        if(JSON.parse(savedUser).password.toLowerCase() === pass){
+          localStorage.setItem("loggedInUser", user);
+          document.getElementById("username").value = "";
+          document.getElementById("password").value = "";
+          showMain();
+        } else {
+          alert("Username atau Password salah! (Cek kembali huruf besar/kecil)");
+        }
+      } else {
+        alert("Username belum terdaftar! Silakan Daftar Akun.");
+      }
+    }
 
-    expenses.forEach(e=>{
-        table += `<tr>
-            <td>${e.date}</td>
-            <td>${e.description}</td>
-            <td data-type="number">${e.amount}</td>
-            <td>${e.category}</td>
+    function register(){
+      let user = document.getElementById("username").value.trim().toLowerCase();
+      let pass = document.getElementById("password").value.trim().toLowerCase();
+      
+      if (!user || !pass) {
+        alert("Username dan password harus diisi!");
+        return;
+      }
+
+      if(localStorage.getItem("user_" + user)){
+        alert("Username sudah ada! Silakan login.");
+        return;
+      }
+      
+      // Simpan akun baru
+      localStorage.setItem("user_" + user, JSON.stringify({username: user, password: pass}));
+      document.getElementById("username").value = "";
+      document.getElementById("password").value = "";
+      alert("Pendaftaran berhasil! Silakan Login.");
+    }
+
+    function logout(){
+      localStorage.removeItem("loggedInUser");
+      document.getElementById("username").value = "";
+      document.getElementById("password").value = "";
+      location.reload();
+    }
+
+    function showMain(){
+        authPage.classList.add("hidden");
+        mainPage.classList.remove("hidden");
+        renderTable();
+    }
+
+    // =========================================================
+    // FUNGSI PENGELUARAN
+    // =========================================================
+
+    function getExpenseKey() {
+        return "expenses_" + localStorage.getItem("loggedInUser");
+    }
+
+    function getExpenses() {
+        return JSON.parse(localStorage.getItem(getExpenseKey())) || [];
+    }
+
+    function addExpense(){
+      let date = document.getElementById("expenseDate").value;
+      let description = document.getElementById("expenseDescription").value;
+      let amount = document.getElementById("expenseAmount").value;
+      let category = document.getElementById("expenseCategory").value;
+      
+      if(!date || !description || !amount || !category || parseInt(amount) <= 0){
+        alert("Lengkapi semua data dan pastikan Jumlah > 0!");
+        return;
+      }
+
+      let expenses = getExpenses();
+      const expense = {date, description, amount: parseInt(amount), category};
+
+      if(editIndex !== null){
+        expenses[editIndex] = expense;
+        editIndex = null;
+        // Ganti tombol Tambah kembali ke default
+        document.querySelector('#mainPage button[onclick="addExpense()"]').innerText = "Tambah Pengeluaran";
+      } else {
+        expenses.push(expense);
+      }
+
+      localStorage.setItem(getExpenseKey(), JSON.stringify(expenses));
+      renderTable();
+
+      document.getElementById("expenseDate").value = "";
+      document.getElementById("expenseDescription").value = "";
+      document.getElementById("expenseAmount").value = "";
+      document.getElementById("expenseCategory").value = "";
+    }
+
+    function renderTable(){
+      let expenses = getExpenses();
+      let list = document.getElementById("transaksiList");
+      list.innerHTML = "";
+      let total = 0;
+      
+      expenses.forEach((e, index) => {
+        total += e.amount;
+        list.innerHTML += `<tr>
+          <td>${e.date}</td>
+          <td>${e.description}</td>
+          <td style="text-align: right;">Rp ${e.amount.toLocaleString('id-ID')}</td>
+          <td>${e.category}</td>
+          <td>
+            <button class="editBtn" onclick="editExpense(${index})">Edit</button>
+            <button class="hapusBtn" onclick="deleteExpense(${index})">Hapus</button>
+          </td>
         </tr>`;
-    });
-    table += '</table>';
-
-    const excelContent = `
-        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-        <head>
-            <meta charset="utf-8" />
-            <style>td {mso-number-format:"\#\,\#\#0";}</style>
-        </head>
-        <body>
-            ${table}
-        </body>
-        </html>
-    `;
-
-    const blob = new Blob([excelContent], { type: 'application/vnd.ms-excel' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `pengeluaran_${new Date().toISOString().slice(0, 10)}.xls`;
-    a.click();
-    URL.revokeObjectURL(url);
-}
-
-// PDF
-async function downloadPDF(){
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF();
-  const expenses = getFilteredExpenses();
-  
-  let y = 20;
-  doc.setFontSize(16);
-  doc.text('Catatan Pengeluaran', 105, 10, {align: 'center'});
-  
-  doc.setFontSize(10);
-  let total = 0;
-  
-  // Header Manual
-  doc.text('Tanggal', 10, y);
-  doc.text('Keterangan', 40, y);
-  doc.text('Jumlah', 100, y);
-  doc.text('Kategori', 140, y);
-  y += 5;
-  doc.line(10, y, 200, y); 
-  y += 5;
-  
-  expenses.forEach(e => {
-    if (y > 280) { 
-      doc.addPage();
-      y = 10;
+      });
+      document.getElementById("totalPenjualan").innerText = "Rp " + total.toLocaleString('id-ID');
     }
-    doc.text(e.date, 10, y);
-    doc.text(e.description.substring(0, 30) + (e.description.length > 30 ? '...' : ''), 40, y);
-    doc.text(`Rp ${parseInt(e.amount).toLocaleString('id-ID')}`, 100, y);
-    doc.text(e.category, 140, y);
-    y += 7;
-    total += parseInt(e.amount);
-  });
-  
-  y += 5;
-  doc.line(10, y, 200, y); 
-  y += 5;
-  doc.setFontSize(12);
-  doc.text(`Total Pengeluaran: Rp ${total.toLocaleString('id-ID')}`, 10, y);
-  
-  doc.save(`pengeluaran_${new Date().toISOString().slice(0, 10)}.pdf`);
-}
 
-// Backup & Restore JSON (Tidak ada perubahan)
-function backupJSON(){
-  const data = localStorage.getItem('expenses');
-  const blob = new Blob([data], {type:'application/json'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `pengeluaran_backup_${new Date().toISOString().slice(0, 10)}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-function restoreJSON(){
-  const input = document.createElement('input');
-  input.type='file';
-  input.accept='application/json';
-  input.onchange=e=>{
-    const file=e.target.files[0];
-    const reader=new FileReader();
-    reader.onload=event=>{
-      try{
-        const data=JSON.parse(event.target.result);
-        if(Array.isArray(data)){
-          localStorage.setItem('expenses',JSON.stringify(data));
-          renderTable();
-          renderCharts();
-          alert('Restore berhasil!');
-        } else alert('File tidak valid!');
-      } catch(err){alert('File tidak valid!');}
-    };
-    reader.readAsText(file);
-  };
-  input.click();
-}
+    function deleteExpense(index){
+      if(!confirm("Yakin ingin menghapus pengeluaran ini?")) return;
+      let expenses = getExpenses();
+      expenses.splice(index, 1);
+      localStorage.setItem(getExpenseKey(), JSON.stringify(expenses));
+      renderTable();
+    }
 
-// Charts (Menggunakan getFilteredExpenses)
-let weeklyChart, monthlyChart, categoryChart;
-function renderCharts(){
-  const expenses = getFilteredExpenses(); 
+    function editExpense(index){
+      let expenses = getExpenses();
+      let e = expenses[index];
+      
+      // Isi form dengan data yang akan diedit
+      document.getElementById("expenseDate").value = e.date;
+      document.getElementById("expenseDescription").value = e.description;
+      document.getElementById("expenseAmount").value = e.amount;
+      document.getElementById("expenseCategory").value = e.category;
+      
+      editIndex = index;
+      
+      // Ubah tombol "Tambah Pengeluaran" menjadi "Simpan Perubahan"
+      document.querySelector('#mainPage button[onclick="addExpense()"]').innerText = "Simpan Perubahan";
+      alert("Silakan edit data di atas lalu klik 'Simpan Perubahan'");
+    }
 
-  // Weekly chart
-  const weekLabels=[];
-  const weekData=[];
-  for(let i=6;i>=0;i--){
-    const d=new Date(); d.setDate(d.getDate()-i);
-    const label=`${d.getDate()}/${d.getMonth()+1}`;
-    weekLabels.push(label);
-    const total = expenses.filter(e=>e.date===d.toISOString().slice(0,10))
-                          .reduce((sum,e)=>sum+parseInt(e.amount),0);
-    weekData.push(total);
-  }
-  if(weeklyChart) weeklyChart.destroy();
-  weeklyChart=new Chart(document.getElementById('weeklyChart').getContext('2d'),{
-    type:'bar',
-    data:{labels:weekLabels,datasets:[{label:'Pengeluaran Mingguan',data:weekData,backgroundColor:'rgba(54,162,235,0.6)'}]},
-    options:{responsive:true,plugins:{legend:{display:false}}}
-  });
+    // =========================================================
+    // FUNGSI EXPORT
+    // =========================================================
 
-  // Monthly chart
-  const monthLabels=[];
-  const monthData=[];
-  for(let m=0;m<12;m++){
-    const year = new Date().getFullYear();
-    monthLabels.push(`${m+1}/${year}`);
-    const total = expenses.filter(e=>{
-      const expDate = new Date(e.date);
-      return expDate.getMonth()===m && expDate.getFullYear()===year;
-    }).reduce((sum,e)=>sum+parseInt(e.amount),0);
-    monthData.push(total);
-  }
-  if(monthlyChart) monthlyChart.destroy();
-  monthlyChart=new Chart(document.getElementById('monthlyChart').getContext('2d'),{
-    type:'line',
-    data:{labels:monthLabels,datasets:[{label:'Pengeluaran Bulanan',data:monthData,backgroundColor:'rgba(255,99,132,0.2)',borderColor:'rgba(255,99,132,1)',fill:true}]},
-    options:{responsive:true,plugins:{legend:{display:false}}}
-  });
+    // Export Excel (XLSX)
+    function exportExcel(){
+      let expenses = getExpenses();
+      let total = expenses.reduce((sum, e) => sum + e.amount, 0);
+      let data = [["No", "Tanggal", "Keterangan", "Jumlah (Rp)", "Kategori"]];
+      
+      expenses.forEach((e, i) => {
+        data.push([i+1, e.date, e.description, e.amount, e.category]);
+      });
+      
+      data.push(["", "", "", "Total", total]);
+      
+      let ws = XLSX.utils.aoa_to_sheet(data);
+      let wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Pengeluaran");
+      XLSX.writeFile(wb, `Pengeluaran_${localStorage.getItem("loggedInUser")}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    }
 
-  // Category chart
-  const categories=['Makan','Transport','Hiburan','Lainnya'];
-  const catData=categories.map(cat=>expenses.filter(e=>e.category===cat).reduce((sum,e)=>sum+parseInt(e.amount),0));
-  if(categoryChart) categoryChart.destroy();
-  categoryChart=new Chart(document.getElementById('categoryChart').getContext('2d'),{
-    type:'pie',
-    data:{labels:categories,datasets:[{data:catData,backgroundColor:['#FF6384','#36A2EB','#FFCE56','#8AFF33']}]},
-    options:{responsive:true}
-  });
-}
-
-// Filter update
-document.getElementById('filter-type').addEventListener('change',()=>{renderTable(); renderCharts();});
-document.getElementById('start-date').addEventListener('change',()=>{renderTable(); renderCharts();});
-document.getElementById('end-date').addEventListener('change',()=>{renderTable(); renderCharts();});
-document.getElementById('filter-category').addEventListener('change',()=>{renderTable(); renderCharts();});
-</script>
+    // Export PDF (Menggunakan jsPDF AutoTable)
+    function exportPDF(){
+      const { jsPDF } = window.jspdf;
+      let doc = new jsPDF();
+      doc.setFontSize(14);
+      doc.text("Laporan Catatan Pengeluaran", 14, 15);
+      
+      let expenses = getExpenses();
+      let total = expenses.reduce((sum, e) => sum + e.amount, 0);
+      
+      let rows = expenses.map((e, i) => [
+        i+1, e.date, e.description, e.amount.toLocaleString('id-ID'), e.category
+      ]);
+      
+      doc.autoTable({
+        head: [["No", "Tanggal", "Keterangan", "Jumlah (Rp)", "Kategori"]],
+        body: rows,
+        startY: 25,
+        styles: { fontSize: 10 },
+        headStyles: { fillColor: [9,132,227] },
+        foot: [["", "", "TOTAL", total.toLocaleString('id-ID'), ""]]
+      });
+      
+      doc.save(`Pengeluaran_${localStorage.getItem("loggedInUser")}_${new Date().toISOString().slice(0, 10)}.pdf`);
+    }
+  </script>
 </body>
 </html>
